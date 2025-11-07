@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brain Game</title>
+    <!-- We will use Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation; /* Disables double-tap to zoom on mobile, improving button responsiveness */
+        }
+        /* A custom class for the "GO!" screen in the reaction test */
+        .reaction-go {
+            background-color: #4ade80; /* Tailwind green-400 */
+            cursor: pointer;
+        }
+        .reaction-wait {
+            background-color: #ef4444; /* Tailwind red-500 */
+            cursor: wait;
+        }
+        .game-screen {
+            display: none; /* All game screens are hidden by default */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-lg mx-auto bg-white rounded-xl shadow-2xl p-6 md:p-8">
+
+        <!-- ===== Main Menu Screen ===== -->
+        <div id="main-menu-screen" class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">🧠 Brain Game</h1>
+            <p class="text-gray-600 mb-8">Choose a game to test your skills</p>
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="showGame('reaction-test-screen')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200">
+                    ⚡ Reaction Test
+                </button>
+                <button onclick="startQuiz('iq')" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200">
+                    💡 IQ Quiz
+                </button>
+                <button onclick="startQuiz('gk')" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200">
+                    🌍 General Knowledge
+                </button>
+                <button onclick="showGame('memory-game-screen'); startMemoryGame();" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200">
+                    🔢 Memory Game
+                </button>
+            </div>
+        </div>
+
+        <!-- ===== Back Button (Template) ===== -->
+        <!-- This is a helper button that we'll inject into game screens -->
+        <button onclick="showGame('main-menu-screen')" class="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200">
+            &larr; Back to Menu
+        </button>
+
+        <!-- ===== Reaction Test Screen ===== -->
+        <div id="reaction-test-screen" class="game-screen text-center">
+            <h2 class="text-2xl font-bold mb-4">⚡ Reaction Test</h2>
+            <!-- This div will be controlled by the JS -->
+            <div id="reaction-box" class="h-64 w-full rounded-lg flex items-center justify-center p-4 text-white text-2xl font-bold transition-colors duration-300" onclick="handleReactionClick()">
+                <div id="reaction-content">
+                    <!-- Content injected by JS -->
+                </div>
+            </div>
+            <div id="reaction-results" class="mt-4 text-lg"></div>
+            <!-- Back button will be added here by JS -->
+        </div>
+
+        <!-- ===== Quiz Screen ===== -->
+        <div id="quiz-screen" class="game-screen">
+            <h2 id="quiz-title" class="text-2xl font-bold text-center mb-4">Quiz</h2>
+            <div id="quiz-content" class="mb-4">
+                <p id="quiz-question" class="text-lg text-gray-700 mb-4 min-h-[50px]"></p>
+                <input id="quiz-input" type="text" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="Your answer...">
+                <button id="quiz-submit" class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200">
+                    Submit
+                </button>
+            </div>
+            <div id="quiz-feedback" class="text-center font-semibold"></div>
+            <div id="quiz-final-score" class="text-center text-xl font-bold"></div>
+            <!-- Back button will be added here by JS -->
+        </div>
+
+        <!-- ===== Memory Game Screen ===== -->
+        <div id="memory-game-screen" class="game-screen text-center">
+            <h2 class="text-2xl font-bold mb-4">🔢 Memory Game</h2>
+            <div id="memory-content">
+                <!-- Content injected by JS -->
+            </div>
+            <div id="memory-feedback" class="mt-4 text-lg font-medium"></div>
+            <!-- Back button will be added here by JS -->
+        </div>
+
+    </div>
+
+    <script>
+        // === Global Variables ===
+        const allScreens = document.querySelectorAll('.game-screen');
+        const mainMenuScreen = document.getElementById('main-menu-screen');
+        const backButtonHtml = document.querySelector('button[onclick="showGame(\'main-menu-screen\')"]').outerHTML;
+        
+        // --- Quiz Data ---
+        const IQ_QUESTIONS = [
+            { question: "What number comes next in the sequence? 2, 4, 8, 16, __", answer: "32" },
+            { question: "Mary's father has five daughters: 1. Nana, 2. Nene, 3. Nini, 4. Nono. What is the name of the fifth daughter?", answer: "Mary" },
+            { question: "Which weighs more: a pound of feathers or a pound of bricks?", answer: "Neither" },
+            { question: "A is the father of B. But B is not the son of A. How is that possible?", answer: "B is his daughter" },
+            { question: "How many months have 28 days?", answer: "12" }
+        ];
+
+        const GK_QUESTIONS = [
+            { question: "What is the capital of Japan?", answer: "Tokyo" },
+            { question: "What is the largest planet in our solar system?", answer: "Jupiter" },
+            { question: "Who wrote 'Romeo and Juliet'?", answer: "Shakespeare" },
+            { question: "What is the chemical symbol for water?", answer: "H2O" },
+            { question: "What is the tallest mountain in the world?", answer: "Mount Everest" }
+        ];
+
+        // --- Quiz State ---
+        let currentQuiz = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+
+        // --- Reaction Test State ---
+        let reactionTimer;
+        let reactionStartTime;
+        let awaitingClick = false;
+
+
+        // === Screen Management ===
+        
+        function showGame(screenId) {
+            // Hide all screens
+            allScreens.forEach(screen => screen.style.display = 'none');
+            mainMenuScreen.style.display = 'none';
+
+            // Show the target screen
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.style.display = 'block';
+                
+                // Add the 'Back to Menu' button if it's a game screen
+                if (screenId !== 'main-menu-screen') {
+                    // Clear old results and add back button
+                    if (screenId === 'reaction-test-screen') {
+                        document.getElementById('reaction-results').innerHTML = '';
+                        startReactionTest(); // Start the game when screen is shown
+                    }
+                    if (screenId === 'quiz-screen') {
+                        document.getElementById('quiz-feedback').innerHTML = '';
+                        document.getElementById('quiz-final-score').innerHTML = '';
+                    }
+                    if (screenId === 'memory-game-screen') {
+                         document.getElementById('memory-feedback').innerHTML = '';
+                    }
+
+                    // Inject the back button if it doesn't exist
+                    if (!targetScreen.querySelector('button[onclick="showGame(\'main-menu-screen\')"]')) {
+                        targetScreen.insertAdjacentHTML('beforeend', backButtonHtml);
+                    }
+                }
+            }
+        }
+
+        // === Game 1: Reaction Test ===
+
+        function startReactionTest() {
+            const reactionBox = document.getElementById('reaction-box');
+            const reactionContent = document.getElementById('reaction-content');
+            document.getElementById('reaction-results').innerHTML = '';
+            
+            reactionBox.className = "h-64 w-full rounded-lg flex items-center justify-center p-4 text-white text-2xl font-bold transition-colors duration-300 reaction-wait";
+            reactionContent.innerHTML = "Get ready...<br>Click when the box turns green.";
+            
+            awaitingClick = false;
+            clearTimeout(reactionTimer); // Clear any existing timer
+
+            // Set a random timeout
+            reactionTimer = setTimeout(() => {
+                reactionBox.className = "h-64 w-full rounded-lg flex items-center justify-center p-4 text-white text-2xl font-bold transition-colors duration-300 reaction-go";
+                reactionContent.innerHTML = "CLICK NOW!";
+                awaitingClick = true;
+                reactionStartTime = Date.now();
+            }, Math.random() * 4000 + 2000); // 2-6 seconds
+        }
+
+        function handleReactionClick() {
+            if (!awaitingClick) {
+                // Clicked too early
+                clearTimeout(reactionTimer);
+                document.getElementById('reaction-content').innerHTML = "Too soon! Click to try again.";
+                document.getElementById('reaction-box').className = "h-64 w-full rounded-lg flex items-center justify-center p-4 text-white text-2xl font-bold transition-colors duration-300 bg-blue-500";
+                // Add a one-time click listener to restart
+                document.getElementById('reaction-box').onclick = () => {
+                    startReactionTest();
+                    // Re-assign the original handler
+                    document.getElementById('reaction-box').onclick = handleReactionClick;
+                };
+            } else {
+                // Clicked in time
+                const endTime = Date.now();
+                const reactionTime = (endTime - reactionStartTime) / 1000;
+                
+                document.getElementById('reaction-results').innerHTML = `Your reaction time: <span class="font-bold text-blue-600">${reactionTime.toFixed(3)}</span> seconds!`;
+                document.getElementById('reaction-content').innerHTML = "Click to play again.";
+                document.getElementById('reaction-box').className = "h-64 w-full rounded-lg flex items-center justify-center p-4 text-white text-2xl font-bold transition-colors duration-300 bg-blue-500";
+                
+                awaitingClick = false;
+                
+                // Add a one-time click listener to restart
+                document.getElementById('reaction-box').onclick = () => {
+                    startReactionTest();
+                    // Re-assign the original handler
+                    document.getElementById('reaction-box').onclick = handleReactionClick;
+                };
+            }
+        }
+        
+        // Assign the initial handler
+        document.getElementById('reaction-box').onclick = handleReactionClick;
+
+        // === Game 2 & 3: Quiz ===
+        
+        function startQuiz(quizType) {
+            currentQuiz = quizType === 'iq' ? [...IQ_QUESTIONS] : [...GK_QUESTIONS];
+            // Shuffle the quiz questions
+            currentQuiz.sort(() => Math.random() - 0.5); 
+            
+            currentQuestionIndex = 0;
+            score = 0;
+
+            document.getElementById('quiz-title').innerText = quizType === 'iq' ? "💡 IQ Quiz" : "🌍 General Knowledge";
+            document.getElementById('quiz-feedback').innerHTML = '';
+            document.getElementById('quiz-final-score').innerHTML = '';
+            document.getElementById('quiz-input').style.display = 'block';
+            document.getElementById('quiz-submit').style.display = 'block';
+
+            showGame('quiz-screen');
+            displayQuizQuestion();
+        }
+
+        function displayQuizQuestion() {
+            if (currentQuestionIndex < currentQuiz.length) {
+                const q = currentQuiz[currentQuestionIndex];
+                document.getElementById('quiz-question').innerText = q.question;
+                document.getElementById('quiz-input').value = '';
+                document.getElementById('quiz-input').focus();
+            } else {
+                // Quiz is over
+                showQuizResults();
+            }
+        }
+
+        function handleQuizSubmit() {
+            const userAnswer = document.getElementById('quiz-input').value.trim().toLowerCase();
+            const correctAnswer = currentQuiz[currentQuestionIndex].answer.toLowerCase();
+            const feedbackEl = document.getElementById('quiz-feedback');
+
+            if (userAnswer === correctAnswer) {
+                score++;
+                feedbackEl.innerHTML = '<span class="text-green-500">Correct!</span>';
+            } else {
+                feedbackEl.innerHTML = `<span class="text-red-500">Wrong. The answer was: ${currentQuiz[currentQuestionIndex].answer}</span>`;
+            }
+
+            currentQuestionIndex++;
+            
+            // Show feedback for a moment, then load next question
+            setTimeout(() => {
+                feedbackEl.innerHTML = '';
+                displayQuizQuestion();
+            }, 1500);
+        }
+
+        // Attach event listener to quiz submit button
+        document.getElementById('quiz-submit').onclick = handleQuizSubmit;
+        // Allow pressing Enter to submit
+        document.getElementById('quiz-input').addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                handleQuizSubmit();
+            }
+        });
+
+
+        function showQuizResults() {
+            document.getElementById('quiz-question').innerText = 'Quiz Complete!';
+            document.getElementById('quiz-input').style.display = 'none';
+            document.getElementById('quiz-submit').style.display = 'none';
+            document.getElementById('quiz-final-score').innerHTML = `Your final score is: ${score} / ${currentQuiz.length}`;
+            
+            // Add a restart button
+            const restartButton = document.createElement('button');
+            restartButton.innerText = 'Restart Quiz';
+            restartButton.className = 'mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200';
+            restartButton.onclick = () => startQuiz(currentQuiz === IQ_QUESTIONS ? 'iq' : 'gk');
+            document.getElementById('quiz-final-score').appendChild(restartButton);
+        }
+
+        // === Game 4: Memory Game ===
+
+        let memorySequence = [];
+
+        function startMemoryGame() {
+            memorySequence = Array.from({length: 5}, () => Math.floor(Math.random() * 10).toString());
+            const sequenceStr = memorySequence.join(' ');
+            
+            const contentEl = document.getElementById('memory-content');
+            const feedbackEl = document.getElementById('memory-feedback');
+            feedbackEl.innerHTML = '';
+            
+            contentEl.innerHTML = `
+                <p class="text-lg mb-4">Memorize this sequence:</p>
+                <div class="text-4xl font-bold tracking-widest bg-gray-100 p-4 rounded-lg">
+                    ${sequenceStr}
+                </div>
+            `;
+
+            // Show the number for 4 seconds
+            setTimeout(() => {
+                contentEl.innerHTML = `
+                    <p class="text-lg mb-4">Time's up! Enter the sequence (numbers separated by spaces):</p>
+                    <input id="memory-input" type="text" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500" placeholder="e.g. 1 2 3 4 5">
+                    <button id="memory-submit" class="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200">
+                        Check Memory
+                    </button>
+                `;
+                document.getElementById('memory-input').focus();
+                // Add event listener to the new button
+                document.getElementById('memory-submit').onclick = checkMemory;
+                document.getElementById('memory-input').addEventListener('keyup', function(event) {
+                    if (event.key === 'Enter') {
+                        checkMemory();
+                    }
+                });
+            }, 4000);
+        }
+
+        function checkMemory() {
+            const userInput = document.getElementById('memory-input').value.trim();
+            const correctSequenceStr = memorySequence.join(' ');
+            const feedbackEl = document.getElementById('memory-feedback');
+            
+            if (userInput === correctSequenceStr) {
+                feedbackEl.innerHTML = '<span class="text-green-500">Perfect memory! Congratulations!</span>';
+            } else {
+                feedbackEl.innerHTML = `
+                    <span class="text-red-500">Not quite right.</span><br>
+                    Correct: <span class="font-semibold">${correctSequenceStr}</span><br>
+                    You wrote: <span class="font-semibold">${userInput}</span>
+                `;
+            }
+
+            // Add a "Try Again" button
+            document.getElementById('memory-content').innerHTML += `
+                <button onclick="startMemoryGame()" class="mt-4 w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition duration-200">
+                    Try Again
+                </button>
+            `;
+        }
+
+    </script>
+</body>
+</html>
